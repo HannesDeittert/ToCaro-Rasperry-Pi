@@ -9,7 +9,7 @@ Raspberry Pi control code for the Adafruit Motor Shield V2.3 (PCA9685 + TB6612) 
 - `src/tocado_pi/cli.py` – CLI entrypoint (`spin`, `move`).
 - `scripts/smoke_test.py` – minimal spin test helper.
 - `scripts/debug_motor_shield.py` – interactive checker for supply, all 4 channels, and encoder ticks.
-- `scripts/motor_web_ui.py` – small web UI to view encoder counts and jog a motor channel.
+- `scripts/motor_web_ui.py` – small web UI to view encoder counts and jog one or several motor channels.
 - `tests/` – pytest unit tests with fakes (no hardware needed).
 - `requirements.txt` / `dev-requirements.txt` – runtime vs. dev deps.
 
@@ -50,6 +50,8 @@ PYTHONPATH=src python scripts/debug_motor_shield.py --duty 1.0 --seconds 1 --pin
 Web UI (encoder readout + forward/reverse/brake controls):
 ```
 PYTHONPATH=src python scripts/motor_web_ui.py --motor-channel 1 --pin-a <BCM_A> --pin-b <BCM_B>
+# Multi-motor example with three encoders:
+# PYTHONPATH=src python scripts/motor_web_ui.py --motor 1:17:27 --motor 2:22:23 --motor 3:24:25
 # Then open http://<pi-ip>:8000 in your browser.
 ```
 
