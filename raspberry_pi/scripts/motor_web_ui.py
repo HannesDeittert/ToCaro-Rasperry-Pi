@@ -13,6 +13,7 @@ import argparse
 import atexit
 import logging
 import threading
+import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
@@ -29,7 +30,7 @@ HTML = """
 <head>
   <meta charset="utf-8">
   <title>Motor Shield UI</title>
-  <style>
+    <style>
     body { font-family: Arial, sans-serif; max-width: 900px; margin: 20px auto; padding: 0 12px; }
     header { margin-bottom: 12px; }
     .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
@@ -65,6 +66,8 @@ HTML = """
       <div class="status">
         <div>Encoder (A/B): {{ m.pin_a if m.pin_a is not none else '-' }}/{{ m.pin_b if m.pin_b is not none else '-' }}</div>
         <div>Zähler: <span id="count-{{ m.channel }}">--</span></div>
+        <div>Δ seit letztem Poll: <span id="delta-{{ m.channel }}">--</span></div>
+        <div>Rate (counts/s): <span id="rate-{{ m.channel }}">--</span></div>
         <div>Throttle: <span id="throttle-{{ m.channel }}">--</span></div>
         <div>Letzte Aktion: <span id="last-{{ m.channel }}">--</span></div>
       </div>
@@ -89,15 +92,19 @@ HTML = """
       const data = await res.json();
       data.motors.forEach((m) => {
         const countEl = document.getElementById(`count-${m.channel}`);
+        const deltaEl = document.getElementById(`delta-${m.channel}`);
+        const rateEl = document.getElementById(`rate-${m.channel}`);
         const thrEl = document.getElementById(`throttle-${m.channel}`);
         const lastEl = document.getElementById(`last-${m.channel}`);
         if (countEl) { countEl.innerText = m.count; }
+        if (deltaEl) { deltaEl.innerText = m.delta; }
+        if (rateEl) { rateEl.innerText = m.rate_cps.toFixed(2); }
         if (thrEl) { thrEl.innerText = m.throttle.toFixed(2); }
         if (lastEl) { lastEl.innerText = m.last_action; }
       });
     }
 
-    setInterval(refreshStatus, 1000);
+    setInterval(refreshStatus, 500);
     refreshStatus();
   </script>
 </body>
@@ -118,6 +125,8 @@ class MotorState:
     encoder: Optional[EncoderReader]
     throttle: float = 0.0
     last_action: str = "idle"
+    last_count: int = 0
+    last_ts: float = 0.0
 
 
 class MultiMotorSession:
@@ -160,15 +169,23 @@ class MultiMotorSession:
 
     def status_all(self) -> List[Dict[str, Any]]:
         with self._lock:
+            now = time.monotonic()
             out = []
             for ch, state in sorted(self._states.items()):
                 count = state.encoder.read() if state.encoder else 0
+                dt = now - state.last_ts if state.last_ts else 0.0
+                delta = count - state.last_count
+                rate = (delta / dt) if dt > 0 else 0.0
+                state.last_count = count
+                state.last_ts = now
                 out.append(
                     {
                         "channel": ch,
                         "count": count,
                         "throttle": float(state.throttle),
                         "last_action": state.last_action,
+                        "delta": delta,
+                        "rate_cps": rate,
                     }
                 )
             return out
@@ -294,7 +311,12 @@ def main(argv=None) -> int:
             encoder.start()
         else:
             LOG.warning("Motor %d has no encoder pins configured; counts will stay at 0", spec.channel)
-        states[spec.channel] = MotorState(driver=drivers[spec.channel], encoder=encoder)
+        states[spec.channel] = MotorState(
+            driver=drivers[spec.channel],
+            encoder=encoder,
+            last_ts=time.monotonic(),
+            last_count=encoder.read() if encoder else 0,
+        )
 
     session = MultiMotorSession(states)
     atexit.register(session.shutdown)
