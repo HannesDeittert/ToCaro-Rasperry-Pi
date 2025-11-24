@@ -8,6 +8,7 @@ Raspberry Pi control code for the Adafruit Motor Shield V2.3 (PCA9685 + TB6612) 
 - `src/tocado_pi/motor_control.py` – simple move/spin controls with limits and stop.
 - `src/tocado_pi/cli.py` – CLI entrypoint (`spin`, `move`).
 - `scripts/smoke_test.py` – minimal spin test helper.
+- `scripts/debug_motor_shield.py` – interactive checker for supply, all 4 channels, and encoder ticks.
 - `tests/` – pytest unit tests with fakes (no hardware needed).
 - `requirements.txt` / `dev-requirements.txt` – runtime vs. dev deps.
 
@@ -38,6 +39,11 @@ PYTHONPATH=src python -m tocado_pi.cli move --target 500 --duty 0.5 --pin-a <BCM
 Smoke test script (short spin):
 ```
 PYTHONPATH=src python scripts/smoke_test.py --duty 0.4 --seconds 2 --pin-a <BCM_A> --pin-b <BCM_B>
+```
+
+Debug the shield (pulses M1–M4, prompts for terminal observations, reports encoder counts):
+```
+PYTHONPATH=src python scripts/debug_motor_shield.py --duty 1.0 --seconds 1 --pin-a <BCM_A> --pin-b <BCM_B>
 ```
 
 ## Wiring notes
