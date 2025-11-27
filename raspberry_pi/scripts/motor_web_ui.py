@@ -42,6 +42,10 @@ HTML = """
     h3 { margin: 6px 0 8px 0; }
     .monitor { margin-top: 8px; }
     .monitor pre { background: #fafafa; border: 1px solid #eee; padding: 8px; height: 140px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    .levels { margin-top: 6px; font-size: 0.95em; }
+    .level-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-left: 4px; vertical-align: middle; }
+    .level-high { background: #27ae60; }
+    .level-low { background: #bdc3c7; }
   </style>
 </head>
 <body>
@@ -73,6 +77,11 @@ HTML = """
         <div>Throttle: <span id="throttle-{{ m.channel }}">--</span></div>
         <div>Letzte Aktion: <span id="last-{{ m.channel }}">--</span></div>
       </div>
+      <div class="levels">
+        Raw A: <span id="rawA-{{ m.channel }}">?</span><span id="dotA-{{ m.channel }}" class="level-dot"></span>
+        Raw B: <span id="rawB-{{ m.channel }}">?</span><span id="dotB-{{ m.channel }}" class="level-dot"></span><br>
+        History: <span id="rawHist-{{ m.channel }}">--</span>
+      </div>
       <div class="monitor">
         <div>Encoder Monitor (letzte Samples):</div>
         <pre id="log-{{ m.channel }}"></pre>
@@ -84,6 +93,8 @@ HTML = """
   <script>
     const history = {};
     const MAX_LOG = 80;
+    const levelHistory = {};
+    const MAX_LEVEL_HISTORY = 40;
 
     function visualizeRate(rate) {
       const mag = Math.min(20, Math.round(Math.abs(rate)));
@@ -105,6 +116,34 @@ HTML = """
       if (el) {
         el.innerText = history[m.channel].join("\\n");
         el.scrollTop = el.scrollHeight;
+      }
+    }
+
+    function updateRaw(m) {
+      if (!levelHistory[m.channel]) { levelHistory[m.channel] = []; }
+      const aVal = (m.raw_a === null || m.raw_a === undefined) ? "?" : m.raw_a;
+      const bVal = (m.raw_b === null || m.raw_b === undefined) ? "?" : m.raw_b;
+      const aEl = document.getElementById(`rawA-${m.channel}`);
+      const bEl = document.getElementById(`rawB-${m.channel}`);
+      if (aEl) { aEl.innerText = aVal; }
+      if (bEl) { bEl.innerText = bVal; }
+
+      const dotA = document.getElementById(`dotA-${m.channel}`);
+      const dotB = document.getElementById(`dotB-${m.channel}`);
+      if (dotA) {
+        dotA.classList.remove("level-high", "level-low");
+        if (aVal === 1 || aVal === "1") dotA.classList.add("level-high"); else if (aVal === 0 || aVal === "0") dotA.classList.add("level-low");
+      }
+      if (dotB) {
+        dotB.classList.remove("level-high", "level-low");
+        if (bVal === 1 || bVal === "1") dotB.classList.add("level-high"); else if (bVal === 0 || bVal === "0") dotB.classList.add("level-low");
+      }
+
+      if (aVal !== "?" && bVal !== "?") {
+        levelHistory[m.channel].push(`${aVal}${bVal}`);
+        if (levelHistory[m.channel].length > MAX_LEVEL_HISTORY) levelHistory[m.channel].shift();
+        const histEl = document.getElementById(`rawHist-${m.channel}`);
+        if (histEl) { histEl.innerText = levelHistory[m.channel].join(" "); }
       }
     }
 
@@ -134,6 +173,7 @@ HTML = """
         if (thrEl) { thrEl.innerText = m.throttle.toFixed(2); }
         if (lastEl) { lastEl.innerText = m.last_action; }
         addLogSample(m);
+        updateRaw(m);
       });
     }
 
@@ -211,6 +251,14 @@ class MultiMotorSession:
                 rate = (delta / dt) if dt > 0 else 0.0
                 state.last_count = count
                 state.last_ts = now
+                raw_a = raw_b = None
+                if state.encoder:
+                    try:
+                        GPIO = state.encoder._ensure_gpio()  # type: ignore[attr-defined]
+                        raw_a = GPIO.input(state.encoder.cfg.pin_a)  # type: ignore[attr-defined]
+                        raw_b = GPIO.input(state.encoder.cfg.pin_b)  # type: ignore[attr-defined]
+                    except Exception as exc:  # pragma: no cover - hardware path
+                        LOG.debug("Raw level read failed for ch %s: %s", ch, exc)
                 out.append(
                     {
                         "channel": ch,
@@ -219,6 +267,8 @@ class MultiMotorSession:
                         "last_action": state.last_action,
                         "delta": delta,
                         "rate_cps": rate,
+                        "raw_a": raw_a,
+                        "raw_b": raw_b,
                     }
                 )
             return out
