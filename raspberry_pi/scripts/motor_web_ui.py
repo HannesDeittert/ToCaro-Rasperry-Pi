@@ -40,6 +40,8 @@ HTML = """
     .status { font-size: 1.0em; }
     input[type=number] { width: 80px; }
     h3 { margin: 6px 0 8px 0; }
+    .monitor { margin-top: 8px; }
+    .monitor pre { background: #fafafa; border: 1px solid #eee; padding: 8px; height: 140px; overflow-y: auto; font-family: monospace; font-size: 12px; }
   </style>
 </head>
 <body>
@@ -71,11 +73,41 @@ HTML = """
         <div>Throttle: <span id="throttle-{{ m.channel }}">--</span></div>
         <div>Letzte Aktion: <span id="last-{{ m.channel }}">--</span></div>
       </div>
+      <div class="monitor">
+        <div>Encoder Monitor (letzte Samples):</div>
+        <pre id="log-{{ m.channel }}"></pre>
+      </div>
     </div>
     {% endfor %}
   </div>
 
   <script>
+    const history = {};
+    const MAX_LOG = 80;
+
+    function visualizeRate(rate) {
+      const mag = Math.min(20, Math.round(Math.abs(rate)));
+      if (mag === 0) return ".";
+      const bar = "|".repeat(mag);
+      return rate >= 0 ? ">" + bar : "<" + bar;
+    }
+
+    function addLogSample(m) {
+      if (!history[m.channel]) { history[m.channel] = []; }
+      const ts = new Date().toLocaleTimeString();
+      history[m.channel].push(
+        `${ts} c=${m.count} Δ=${m.delta} r=${m.rate_cps.toFixed(2)} ${visualizeRate(m.rate_cps)}`
+      );
+      if (history[m.channel].length > MAX_LOG) {
+        history[m.channel].shift();
+      }
+      const el = document.getElementById(`log-${m.channel}`);
+      if (el) {
+        el.innerText = history[m.channel].join("\\n");
+        el.scrollTop = el.scrollHeight;
+      }
+    }
+
     async function sendCommand(channel, action) {
       const dutyField = document.getElementById(`duty-${channel}`);
       const duty = parseFloat(dutyField.value || "0") || 0;
@@ -101,6 +133,7 @@ HTML = """
         if (rateEl) { rateEl.innerText = m.rate_cps.toFixed(2); }
         if (thrEl) { thrEl.innerText = m.throttle.toFixed(2); }
         if (lastEl) { lastEl.innerText = m.last_action; }
+        addLogSample(m);
       });
     }
 
