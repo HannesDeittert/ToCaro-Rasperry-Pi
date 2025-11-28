@@ -86,6 +86,7 @@ HTML = """
       <div>Letzte Aktion: <span id="last">--</span></div>
       <div>In Bewegung: <span id="moving">--</span></div>
       <div>Max Count: <span id="max">--</span></div>
+      <div>Sign: <span id="sign">--</span></div>
     </div>
 
     <div class="levels">
@@ -185,6 +186,7 @@ HTML = """
       document.getElementById("moving").innerText = m.in_motion;
       document.getElementById("max").innerText = m.max_count;
       document.getElementById("maxCount").innerText = m.max_count;
+      document.getElementById("sign").innerText = m.sign;
       addLogSample(m);
       updateRaw(m);
     }
@@ -207,6 +209,7 @@ class CalSession:
         self._last_count = 0
         self._last_ts = time.monotonic()
         self._max_count = 0
+        self._sign = 1  # +1 or -1 for travel direction
         self._move_thread: Optional[threading.Thread] = None
         self._in_motion = False
         self._stop_flag = False
@@ -228,16 +231,19 @@ class CalSession:
         with self._lock:
             if action == "set_home":
                 self.encoder.reset(0)
-                self.controller.cfg.limits.min_count = 0
+                self.controller.cfg.limits.min_count = -self._max_count if self._max_count else 0
                 self._last_action = "home set"
             elif action == "set_max":
                 current = self.encoder.read()
-                if current > 0:
-                    self._max_count = current
-                    self.controller.cfg.limits.max_count = current
-                    self._last_action = f"max set {current}"
+                if current != 0:
+                    self._sign = 1 if current > 0 else -1
+                    self._max_count = abs(current)
+                    self.controller.cfg.limits.max_count = self._max_count
+                    # allow both directions in limits to avoid ValueErrors
+                    self.controller.cfg.limits.min_count = -self._max_count
+                    self._last_action = f"max set {current} (abs {self._max_count}, sign {self._sign})"
                 else:
-                    self._last_action = "max not set (<=0)"
+                    self._last_action = "max not set (0)"
             elif action == "move_fraction":
                 frac = float(payload.get("fraction", 0.0) or 0.0)
                 frac = max(0.0, min(1.0, frac))
@@ -270,10 +276,19 @@ class CalSession:
         if self._in_motion:
             self._last_action = "busy"
             return
+        if self._max_count <= 0:
+            self._last_action = "set max first"
+            return
+        # clamp target into [0, max_count]
+        target = max(0, min(self._max_count, target))
+        signed_target = self._sign * target
+        # widen limits to be symmetric so signed_target stays in bounds
+        self.controller.cfg.limits.min_count = -self._max_count
+        self.controller.cfg.limits.max_count = self._max_count
         duty = float(payload.get("duty", self.controller.cfg.shield.default_duty) or self.controller.cfg.shield.default_duty)
-        self._move_thread = threading.Thread(target=self._run_move, args=(target, duty), daemon=True)
+        self._move_thread = threading.Thread(target=self._run_move, args=(signed_target, duty), daemon=True)
         self._move_thread.start()
-        self._last_action = f"moving to {target}"
+        self._last_action = f"moving to {target} (signed {signed_target})"
 
     def _finish_jog(self, seconds: float) -> None:
         try:
@@ -306,6 +321,7 @@ class CalSession:
                 "last_action": self._last_action,
                 "in_motion": self._in_motion,
                 "max_count": self._max_count,
+                "sign": self._sign,
                 "raw_a": raw_a,
                 "raw_b": raw_b,
             }
