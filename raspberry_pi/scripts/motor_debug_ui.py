@@ -266,6 +266,7 @@ def main(argv=None) -> int:
     parser.add_argument("--pin-b", type=int, default=27, help="BCM pin for encoder B")
     parser.add_argument("--no-pullup", action="store_true", help="Disable pull-ups on encoder pins")
     parser.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
+    parser.add_argument("--busy-ok", action="store_true", help="Ignore GPIO busy errors (setmode already in use)")
     parser.add_argument("--host", default="0.0.0.0", help="Host/IP to bind")
     parser.add_argument("--port", type=int, default=8000, help="HTTP port")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -275,7 +276,13 @@ def main(argv=None) -> int:
 
     encoder_cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup, debounce_ms=args.debounce_ms)
     encoder = EncoderReader(encoder_cfg, name="debug-encoder")
-    encoder.start()
+    try:
+        encoder.start()
+    except RuntimeError as exc:
+        if "mode has been set" in str(exc).lower() and args.busy_ok:
+            LOG.warning("Ignoring GPIO mode error due to --busy-ok; encoder may already be active elsewhere.")
+        else:
+            raise
 
     shield_cfg = MotorShieldConfig(motor_channel=args.motor_channel, i2c_address=args.i2c_address)
     driver = build_motorkit_driver(shield_cfg)
