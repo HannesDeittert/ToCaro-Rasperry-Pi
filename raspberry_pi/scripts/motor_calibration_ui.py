@@ -430,7 +430,7 @@ def main(argv=None) -> int:
     parser.add_argument("--default-duty", type=float, default=0.5, help="Default duty for moves")
     parser.add_argument("--max-runtime", type=float, default=15.0, help="Max runtime seconds for a move")
     parser.add_argument("--temp-max-counts", type=int, default=200000, help="Temporary max count before calibration")
-    parser.add_argument("--poll-interval", type=float, default=0.01, help="Polling interval seconds")
+    parser.add_argument("--poll-interval", type=float, default=0.001, help="Polling interval seconds")
     parser.add_argument("--tolerance", type=int, default=2, help="Stop tolerance in counts")
     parser.add_argument("--host", default="0.0.0.0", help="Host/IP to bind")
     parser.add_argument("--port", type=int, default=8000, help="HTTP port")

@@ -87,7 +87,7 @@ def main(argv=None) -> int:
     parser.add_argument("--move-duty", type=float, default=0.5, help="Duty for automatic moves")
     parser.add_argument("--max-runtime", type=float, default=15.0, help="Max runtime seconds for a move")
     parser.add_argument("--max-runtime-counts", type=int, default=200000, help="Temporary max count until calibrated")
-    parser.add_argument("--poll-interval", type=float, default=0.01, help="Polling interval seconds")
+    parser.add_argument("--poll-interval", type=float, default=0.001, help="Polling interval seconds")
     parser.add_argument("--tolerance", type=int, default=2, help="Stop tolerance in counts")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args(argv)
