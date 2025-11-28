@@ -126,11 +126,14 @@ class EncoderReader:
         pull = GPIO.PUD_UP if self.cfg.pull_up else GPIO.PUD_OFF
         GPIO.setup(self.cfg.pin_a, GPIO.IN, pull_up_down=pull)
         GPIO.setup(self.cfg.pin_b, GPIO.IN, pull_up_down=pull)
+        kwargs = {}
+        if self.cfg.debounce_ms and self.cfg.debounce_ms > 0:
+            kwargs["bouncetime"] = self.cfg.debounce_ms
         GPIO.add_event_detect(
             self.cfg.pin_a,
             GPIO.BOTH,
             callback=self._handle_edge,
-            bouncetime=self.cfg.debounce_ms,
+            **kwargs,
         )
         self._started = True
         LOG.info("%s listening on A=%s B=%s", self.name, self.cfg.pin_a, self.cfg.pin_b)
