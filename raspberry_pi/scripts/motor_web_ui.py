@@ -361,6 +361,7 @@ def main(argv=None) -> int:
     parser.add_argument("--pin-a", type=int, default=17, help="Fallback BCM pin for encoder A (single motor mode)")
     parser.add_argument("--pin-b", type=int, default=27, help="Fallback BCM pin for encoder B (single motor mode)")
     parser.add_argument("--no-pullup", action="store_true", help="Disable pull-ups on encoder pins")
+    parser.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
     parser.add_argument("--host", default="0.0.0.0", help="Host/IP to bind (default: all interfaces)")
     parser.add_argument("--port", type=int, default=8000, help="HTTP port to serve on")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -389,7 +390,7 @@ def main(argv=None) -> int:
     for spec in specs:
         encoder = None
         if spec.pin_a is not None and spec.pin_b is not None:
-            cfg = EncoderConfig(pin_a=spec.pin_a, pin_b=spec.pin_b, pull_up=not args.no_pullup)
+            cfg = EncoderConfig(pin_a=spec.pin_a, pin_b=spec.pin_b, pull_up=not args.no_pullup, debounce_ms=args.debounce_ms)
             encoder = EncoderReader(cfg, name=f"encoder{spec.channel}")
             encoder.start()
         else:

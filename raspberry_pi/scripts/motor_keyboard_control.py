@@ -35,6 +35,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pin-a", type=int, default=17, help="BCM pin for encoder A")
     p.add_argument("--pin-b", type=int, default=27, help="BCM pin for encoder B")
     p.add_argument("--no-pullup", action="store_true", help="Disable pull-ups on encoder pins")
+    p.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
     p.add_argument("--duty", type=float, default=0.4, help="Duty magnitude for forward/reverse jogs")
     p.add_argument("--poll-interval", type=float, default=0.001, help="Poll interval seconds for display/rate")
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -101,7 +102,7 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=getattr(logging, args.log_level))
 
-    encoder_cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup)
+    encoder_cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup, debounce_ms=args.debounce_ms)
     encoder = EncoderReader(encoder_cfg, name="kbd-encoder")
     encoder.start()
 

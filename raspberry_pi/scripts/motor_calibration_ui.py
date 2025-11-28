@@ -427,6 +427,7 @@ def main(argv=None) -> int:
     parser.add_argument("--pin-a", type=int, default=17, help="BCM pin for encoder A")
     parser.add_argument("--pin-b", type=int, default=27, help="BCM pin for encoder B")
     parser.add_argument("--no-pullup", action="store_true", help="Disable pull-ups on encoder pins")
+    parser.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
     parser.add_argument("--default-duty", type=float, default=0.5, help="Default duty for moves")
     parser.add_argument("--max-runtime", type=float, default=15.0, help="Max runtime seconds for a move")
     parser.add_argument("--temp-max-counts", type=int, default=200000, help="Temporary max count before calibration")
@@ -439,7 +440,7 @@ def main(argv=None) -> int:
 
     logging.basicConfig(level=getattr(logging, args.log_level))
 
-    encoder_cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup)
+    encoder_cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup, debounce_ms=args.debounce_ms)
     encoder = EncoderReader(encoder_cfg, name="cal-encoder")
     encoder.start()
 

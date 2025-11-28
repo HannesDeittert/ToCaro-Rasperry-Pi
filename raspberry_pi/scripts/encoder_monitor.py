@@ -29,6 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--pin-a", type=int, required=True, help="BCM pin for encoder A (attach interrupt)")
     p.add_argument("--pin-b", type=int, required=True, help="BCM pin for encoder B")
     p.add_argument("--no-pullup", action="store_true", help="Disable pull-ups (default: enabled)")
+    p.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
     p.add_argument("--log-edges", action="store_true", help="Print every edge (A/B states)")
     p.add_argument("--show-levels", action="store_true", help="Print raw A/B levels every interval")
     p.add_argument("--interval", type=float, default=0.2, help="Print interval seconds")
@@ -40,7 +41,7 @@ def main(argv=None) -> int:
     args = build_parser().parse_args(argv)
     logging.basicConfig(level=getattr(logging, args.log_level))
 
-    cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup)
+    cfg = EncoderConfig(pin_a=args.pin_a, pin_b=args.pin_b, pull_up=not args.no_pullup, debounce_ms=args.debounce_ms)
     enc = EncoderReader(cfg, name="monitor")
 
     # Wrap edge handler to optionally log transitions

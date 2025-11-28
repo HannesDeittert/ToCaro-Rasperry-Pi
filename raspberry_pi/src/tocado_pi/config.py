@@ -20,7 +20,7 @@ class EncoderConfig:
     pin_a: int
     pin_b: int
     pull_up: bool = True
-    debounce_ms: int = 2  # hardware debouncing is preferred; this is a fallback
+    debounce_ms: int = 0  # hardware debouncing is preferred; this is a fallback
 
 
 @dataclass
