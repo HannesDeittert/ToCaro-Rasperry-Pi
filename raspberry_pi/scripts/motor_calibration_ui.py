@@ -218,7 +218,7 @@ HTML = """
       updateRaw(m);
     }
 
-    setInterval(refreshStatus, 400);
+    setInterval(refreshStatus, 100); // 10 Hz UI refresh for snappier counts
     refreshStatus();
   </script>
 </body>
