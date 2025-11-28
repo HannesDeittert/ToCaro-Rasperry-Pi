@@ -62,6 +62,8 @@ HTML = """
       <div>Zähler: <span id="count">--</span></div>
       <div>Δ seit letztem Poll: <span id="delta">--</span></div>
       <div>Rate (counts/s): <span id="rate">--</span></div>
+      <div>Richtung: <span id="direction">--</span></div>
+      <div>Letzter Richtungswechsel: <span id="lastDirChange">--</span></div>
       <div>Throttle: <span id="throttle">--</span></div>
       <div>Letzte Aktion: <span id="last">--</span></div>
     </div>
@@ -81,6 +83,8 @@ HTML = """
     const levelHistory = [];
     const MAX_LOG = 120;
     const MAX_LEVEL_HISTORY = 60;
+    let lastDir = "--";
+    let lastDirChange = "";
 
     function visualizeRate(rate) {
       const mag = Math.min(20, Math.round(Math.abs(rate)));
@@ -91,7 +95,7 @@ HTML = """
 
     function addLogSample(m) {
       const ts = new Date().toLocaleTimeString();
-      history.push(`${ts} c=${m.count} Δ=${m.delta} r=${m.rate_cps.toFixed(2)} ${visualizeRate(m.rate_cps)}`);
+      history.push(`${ts} c=${m.count} Δ=${m.delta} r=${m.rate_cps.toFixed(2)} dir=${m.direction} ${visualizeRate(m.rate_cps)}`);
       if (history.length > MAX_LOG) history.shift();
       const el = document.getElementById("log");
       if (el) {
@@ -139,13 +143,15 @@ HTML = """
       document.getElementById("count").innerText = m.count;
       document.getElementById("delta").innerText = m.delta;
       document.getElementById("rate").innerText = m.rate_cps.toFixed(2);
+      document.getElementById("direction").innerText = m.direction;
+      document.getElementById("lastDirChange").innerText = m.last_dir_change || "--";
       document.getElementById("throttle").innerText = m.throttle.toFixed(2);
       document.getElementById("last").innerText = m.last_action;
       addLogSample(m);
       updateRaw(m);
     }
 
-    setInterval(refreshStatus, 400);
+    setInterval(refreshStatus, 100); // 10 Hz for less delay
     refreshStatus();
   </script>
 </body>
@@ -162,6 +168,8 @@ class SingleMotorSession:
         self._last_action = "idle"
         self._last_count = 0
         self._last_ts = time.monotonic()
+        self._last_dir = "--"
+        self._last_dir_change: Optional[str] = None
 
     def command(self, action: str, duty: float) -> None:
         duty = float(duty)
@@ -198,6 +206,16 @@ class SingleMotorSession:
             rate = (delta / dt) if dt > 0 else 0.0
             self._last_count = count
             self._last_ts = now
+            direction = self._last_dir
+            if delta > 0:
+                if self._last_dir != "fwd":
+                    self._last_dir_change = time.strftime("%H:%M:%S")
+                direction = "fwd"
+            elif delta < 0:
+                if self._last_dir != "rev":
+                    self._last_dir_change = time.strftime("%H:%M:%S")
+                direction = "rev"
+            self._last_dir = direction
             raw_a = raw_b = None
             try:
                 GPIO = self.encoder._ensure_gpio()  # type: ignore[attr-defined]
@@ -209,6 +227,8 @@ class SingleMotorSession:
                 "count": count,
                 "delta": delta,
                 "rate_cps": rate,
+                "direction": direction,
+                "last_dir_change": self._last_dir_change,
                 "throttle": float(self._throttle),
                 "last_action": self._last_action,
                 "raw_a": raw_a,
