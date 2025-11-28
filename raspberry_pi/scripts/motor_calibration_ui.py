@@ -42,6 +42,7 @@ HTML = """
     .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 8px; }
     button { padding: 6px 10px; }
     input[type=number] { width: 80px; }
+    input[type=range] { width: 260px; }
     .monitor pre { background: #fafafa; border: 1px solid #eee; padding: 8px; height: 140px; overflow-y: auto; font-family: monospace; font-size: 12px; }
     .levels { margin-top: 6px; font-size: 0.95em; }
     .level-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ccc; margin-left: 4px; vertical-align: middle; }
@@ -67,6 +68,12 @@ HTML = """
       <label for="abs">Abs count:</label>
       <input type="number" id="abs" step="1" value="0">
       <button onclick="moveAbs()">Move to Count</button>
+    </div>
+
+    <div class="row">
+      <label for="slider">Position (%):</label>
+      <input type="range" id="slider" min="0" max="100" step="1" value="50" oninput="updateSliderLabel()" onchange="sliderMove()">
+      <span id="sliderLabel">50%</span>
     </div>
 
     <div class="row">
@@ -106,6 +113,7 @@ HTML = """
     const levelHistory = [];
     const MAX_LOG = 120;
     const MAX_LEVEL_HISTORY = 60;
+    let sliderDisabled = true;
 
     function visualizeRate(rate) {
       const mag = Math.min(20, Math.round(Math.abs(rate)));
@@ -174,6 +182,17 @@ HTML = """
       const target = parseInt(document.getElementById("abs").value || "0");
       sendCommand("move_abs", { target: target });
     }
+    function updateSliderLabel() {
+      const slider = document.getElementById("slider");
+      const lbl = document.getElementById("sliderLabel");
+      if (lbl) lbl.innerText = `${slider.value}%`;
+    }
+    function sliderMove() {
+      if (sliderDisabled) return;
+      const slider = document.getElementById("slider");
+      const frac = parseInt(slider.value || "0") / 100.0;
+      sendCommand("move_fraction", { fraction: frac });
+    }
 
     async function refreshStatus() {
       const res = await fetch("/status");
@@ -187,6 +206,14 @@ HTML = """
       document.getElementById("max").innerText = m.max_count;
       document.getElementById("maxCount").innerText = m.max_count;
       document.getElementById("sign").innerText = m.sign;
+      const slider = document.getElementById("slider");
+      const lbl = document.getElementById("sliderLabel");
+      sliderDisabled = (m.max_count <= 0) || m.in_motion;
+      if (slider) {
+        slider.disabled = sliderDisabled;
+        slider.style.opacity = sliderDisabled ? 0.5 : 1.0;
+      }
+      if (lbl) lbl.style.opacity = sliderDisabled ? 0.5 : 1.0;
       addLogSample(m);
       updateRaw(m);
     }
@@ -286,6 +313,7 @@ class CalSession:
         self.controller.cfg.limits.min_count = -self._max_count
         self.controller.cfg.limits.max_count = self._max_count
         duty = float(payload.get("duty", self.controller.cfg.shield.default_duty) or self.controller.cfg.shield.default_duty)
+        LOG.info("Starting move target=%s signed=%s duty=%.2f max=%s sign=%s", target, signed_target, duty, self._max_count, self._sign)
         self._move_thread = threading.Thread(target=self._run_move, args=(signed_target, duty), daemon=True)
         self._move_thread.start()
         self._last_action = f"moving to {target} (signed {signed_target})"
