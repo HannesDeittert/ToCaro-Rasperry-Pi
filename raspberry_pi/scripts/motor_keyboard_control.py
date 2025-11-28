@@ -1,22 +1,4 @@
 """
-Keyboard-controlled motor jog with live encoder readout (like a fast serial monitor).
-
-Controls (in the terminal):
-- Right arrow: forward at set duty
-- Left arrow: reverse at set duty
-- Space: brake (stop)
-- R: release (coast)
-- Q or Esc: quit
-
-Display updates ~20 Hz; encoder counts are read via GPIO interrupts and polled for display.
-
-Example (Motor 1, encoder A/B on BCM 17/27):
-    PYTHONPATH=src python scripts/motor_keyboard_control.py --motor-channel 1 --pin-a 17 --pin-b 27
-"""
-
-from __future__ import annotations
-
-"""
 Keyboard-controlled motor jog with fast encoder count print (minimal, Uno-like).
 
 Controls (terminal):
