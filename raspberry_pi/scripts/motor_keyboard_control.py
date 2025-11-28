@@ -16,6 +16,24 @@ Example (Motor 1, encoder A/B on BCM 17/27):
 
 from __future__ import annotations
 
+"""
+Keyboard-controlled motor jog with fast encoder count print (minimal, Uno-like).
+
+Controls (terminal):
+- Right arrow: forward
+- Left arrow: reverse
+- Space: brake
+- R: release (coast)
+- Q or Esc: quit
+
+Prints count/delta/rate at ~20 Hz; encoder updates instantly via interrupts.
+
+Example (Motor 1, encoder A/B on BCM 17/27):
+    PYTHONPATH=src python scripts/motor_keyboard_control.py --motor-channel 1 --pin-a 17 --pin-b 27
+"""
+
+from __future__ import annotations
+
 import argparse
 import atexit
 import curses
@@ -29,7 +47,7 @@ LOG = logging.getLogger(__name__)
 
 
 def build_parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="Keyboard jog + encoder monitor")
+    p = argparse.ArgumentParser(description="Keyboard jog + fast encoder print")
     p.add_argument("--motor-channel", type=int, default=1, help="Motor channel on shield (1-4)")
     p.add_argument("--i2c-address", type=lambda x: int(x, 0), default=0x60, help="I2C address of Motor Shield")
     p.add_argument("--pin-a", type=int, default=17, help="BCM pin for encoder A")
@@ -39,15 +57,6 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--poll-interval", type=float, default=0.001, help="Poll interval seconds for display/rate")
     p.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     return p
-
-
-def read_raw_levels(enc: EncoderReader):
-    try:
-        GPIO = enc._ensure_gpio()  # type: ignore[attr-defined]
-        return GPIO.input(enc.cfg.pin_a), GPIO.input(enc.cfg.pin_b)  # type: ignore[attr-defined]
-    except Exception as exc:  # pragma: no cover - hardware path
-        LOG.debug("Raw read failed: %s", exc)
-        return None, None
 
 
 def run_ui(stdscr, encoder: EncoderReader, motor, duty: float, poll_interval: float):
@@ -95,13 +104,11 @@ def run_ui(stdscr, encoder: EncoderReader, motor, duty: float, poll_interval: fl
         rate = (delta / dt) if dt > 0 else 0.0
         last_count = count
         last_ts = now
-        raw_a, raw_b = read_raw_levels(encoder)
 
         stdscr.erase()
         stdscr.addstr(0, 0, "Keyboard Motor Control (q/esc quit, arrows fwd/rev, space brake, R release)")
         stdscr.addstr(2, 0, f"Count: {count:>10d}   Δ: {delta:>6d}   Rate: {rate:>8.2f} cnt/s")
         stdscr.addstr(3, 0, f"Throttle: {throttle:+.3f}   Last: {last_action}")
-        stdscr.addstr(4, 0, f"Raw A/B: {raw_a if raw_a is not None else '?'} / {raw_b if raw_b is not None else '?'}")
         stdscr.refresh()
         time.sleep(poll_interval)
 
