@@ -267,6 +267,8 @@ def main(argv=None) -> int:
     parser.add_argument("--no-pullup", action="store_true", help="Disable pull-ups on encoder pins")
     parser.add_argument("--debounce-ms", type=int, default=0, help="GPIO bouncetime in ms (0 to disable)")
     parser.add_argument("--busy-ok", action="store_true", help="Ignore GPIO busy errors (setmode already in use)")
+    parser.add_argument("--print-loop", action="store_true", help="Print count/delta/rate/raw to stdout periodically")
+    parser.add_argument("--print-interval", type=float, default=0.1, help="Print interval seconds when --print-loop is set")
     parser.add_argument("--host", default="0.0.0.0", help="Host/IP to bind")
     parser.add_argument("--port", type=int, default=8000, help="HTTP port")
     parser.add_argument("--log-level", default="INFO", choices=["DEBUG", "INFO", "WARNING", "ERROR"])
@@ -291,9 +293,36 @@ def main(argv=None) -> int:
 
     app = create_app(session, channel=args.motor_channel, pin_a=args.pin_a, pin_b=args.pin_b, address_hex=f"{args.i2c_address:02x}")
 
+    stop_print = False
+
+    def print_loop():
+        last_count = encoder.read()
+        last_ts = time.monotonic()
+        while not stop_print:
+            time.sleep(args.print_interval)
+            now = time.monotonic()
+            count = encoder.read()
+            dt = now - last_ts
+            delta = count - last_count
+            rate = (delta / dt) if dt > 0 else 0.0
+            last_count = count
+            last_ts = now
+            raw_a = raw_b = "?"
+            try:
+                GPIO = encoder._ensure_gpio()  # type: ignore[attr-defined]
+                raw_a = GPIO.input(encoder.cfg.pin_a)  # type: ignore[attr-defined]
+                raw_b = GPIO.input(encoder.cfg.pin_b)  # type: ignore[attr-defined]
+            except Exception:
+                pass
+            print(f"count={count} delta={delta} rate={rate:.2f} rawA={raw_a} rawB={raw_b}")
+
+    if args.print_loop:
+        threading.Thread(target=print_loop, daemon=True).start()
+
     try:
         app.run(host=args.host, port=args.port, debug=False, use_reloader=False)
     finally:
+        stop_print = True
         session.shutdown()
     return 0
 
